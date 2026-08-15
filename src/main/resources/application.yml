@@ -25,15 +25,25 @@ spring:
       uri: ${MONGO_URI}
 
   # --- EMAIL NOTIFICATION SETTINGS ---
+#  mail:
+#    host: smtp.gmail.com
+#    port: 587
+#    username: ${EMAIL_USER}
+#    password: ${EMAIL_PASS}
+#    properties:
+#      mail.smtp.auth: true
+#      mail.smtp.starttls.enable: true
+#      mail.smtp.starttls.required: true
   mail:
-    host: smtp.gmail.com
+    host: smtp-relay.brevo.com
     port: 587
-    username: ${EMAIL_USER}
-    password: ${EMAIL_PASS}
+    username: ${BREVO_USER}   # e.g. xxxx@smtp-brevo.com
+    password: ${BREVO_PASSWORD}   # your SMTP key
     properties:
       mail.smtp.auth: true
       mail.smtp.starttls.enable: true
       mail.smtp.starttls.required: true
+
 
   # --- BASIC SECURITY ---
   security:
@@ -42,7 +52,7 @@ spring:
       password: ${ADMIN_PASS:admin123}
 
 server:
-  port: 8080
+  port: ${PORT:8080}
 
 # --- CUSTOM APPLICATION PROPERTIES ---
 app:
