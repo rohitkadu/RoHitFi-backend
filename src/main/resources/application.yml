@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: rohitfi-backend
+
+  # --- RELATIONAL DATABASE (POSTGRESQL) ---
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASS}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    open-in-view: false
+    properties:
+      hibernate:
+        default_schema: public
+        format_sql: true
+
+  # --- DOCUMENT DATABASE (MONGODB) ---
+  data:
+    mongodb:
+      uri: ${MONGO_URI}
+
+  # --- EMAIL NOTIFICATION SETTINGS ---
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${EMAIL_USER}
+    password: ${EMAIL_PASS}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  # --- BASIC SECURITY ---
+  security:
+    user:
+      name: admin
+      password: ${ADMIN_PASS:admin123}
+
+server:
+  port: 8080
+
+# --- CUSTOM APPLICATION PROPERTIES ---
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: 86400000
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs
+
+logging:
+  level:
+    com.rohitfi: DEBUG
+    org.springframework.security: INFO
