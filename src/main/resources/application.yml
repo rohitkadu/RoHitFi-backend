@@ -27,18 +27,13 @@ spring:
   # --- EMAIL NOTIFICATION SETTINGS ---
   mail:
     host: smtp.gmail.com
-    port: 465
+    port: 587
     username: ${EMAIL_USER}
     password: ${EMAIL_PASS}
     properties:
-      mail:
-        smtp:
-          auth: true
-          socketFactory.port: 465
-          socketFactory.class: javax.net.ssl.SSLSocketFactory
-          ssl.enable: true
-          starttls:
-            enable: true
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: true
 
   # --- BASIC SECURITY ---
   security:
