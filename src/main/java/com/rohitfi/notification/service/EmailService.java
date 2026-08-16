@@ -1,301 +1,258 @@
 package com.rohitfi.notification.service;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    private final RestClient restClient;
 
-    @Value("${spring.mail.username}")
-    private String fromEmail;
+    @Value("${BREVO_API_KEY:}")
+    private String apiKey;
 
-    @Async // Runs in a background thread!
-    public void sendWelcomeEmail(String toEmail, String mobile) {
+    @Value("${BREVO_SENDER_EMAIL:rohitkadufreelance@gmail.com}")
+    private String senderEmail;
+
+    public EmailService() {
+        this.restClient = RestClient.builder()
+                .baseUrl("https://api.brevo.com/v3")
+                .build();
+    }
+
+    /**
+     * Centralized method to call Brevo SMTP API.
+     * Includes explicit status checking and robust error extraction.
+     */
+    private void sendViaBrevoApi(String toEmail, String subject, String htmlContent) {
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("BREVO_API_KEY is not set. Skipping email dispatch to {}", toEmail);
+            return;
+        }
+
         try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            Map<String, Object> payload = Map.of(
+                    "sender", Map.of("name", "RoHitFi Digital Banking", "email", senderEmail),
+                    "to", List.of(Map.of("email", toEmail)),
+                    "subject", subject,
+                    "htmlContent", htmlContent
+            );
 
-            helper.setFrom(fromEmail);
-            helper.setTo(toEmail);
-            helper.setSubject("Welcome to Ro💳Hit📈Fi — Your Digital Banking Journey 🚀");
+            ResponseEntity<Void> response = restClient.post()
+                    .uri("/smtp/email")
+                    .header("api-key", apiKey)
+                    .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                    .body(payload)
+                    .retrieve()
+                    .toBodilessEntity();
 
-            String htmlContent = "<!doctype html>"
-                    + "<html><head>"
-                    + "<meta charset='utf-8'/>"
-                    + "<meta name='viewport' content='width=device-width,initial-scale=1'/>"
-                    + "<style>"
-                    + "  body { font-family: 'Segoe UI', Roboto, Arial, sans-serif; color: #111827; background:#f3f4f6; margin:0; padding:20px; }"
-                    + "  .wrap { max-width:680px; margin:0 auto; }"
-                    + "  .card { background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 6px 18px rgba(15,23,42,0.06); }"
-                    + "  .header { padding:20px 24px; background:linear-gradient(90deg,#0b5cff 0%,#00c4ff 100%); color:#fff; display:flex; align-items:center; gap:12px; }"
-                    + "  .brand { font-weight:700; font-size:20px; letter-spacing:0.2px; }"
-                    + "  .body { padding:22px; }"
-                    + "  .muted { color:#6b7280; font-size:13px; }"
-                    + "  .notice { background:#fff7ed; border-left:4px solid #f59e0b; padding:12px; border-radius:6px; margin:14px 0; color:#92400e; }"
-                    + "  .cta { display:inline-block; margin-top:12px; padding:10px 14px; background:#0b5cff; color:#fff; border-radius:8px; text-decoration:none; font-weight:600; }"
-                    + "  .footer { padding:16px 22px; background:#f9fafb; color:#6b7280; font-size:12px; }"
-                    + "  .small { font-size:13px; color:#374151; }"
-                    + "  @media (max-width:480px){ .header{padding:16px} .body{padding:16px} }"
-                    + "</style>"
-                    + "</head><body>"
-                    + "<div class='wrap'>"
-                    + "  <div class='card'>"
-                    + "    <div class='header'>"
-                    + "      <div style='font-size:28px;'>💳📈</div>"
-                    + "      <div>"
-                    + "        <div class='brand'>Ro<span style='color:#ffd166;'>💳</span>Hit<span style='color:#ffd166;'>📈</span>Fi</div>"
-                    + "        <div style='font-size:12px; opacity:0.95;'>Secure · Fast · Modern</div>"
-                    + "      </div>"
-                    + "    </div>"
-                    + "    <div class='body'>"
-                    + "      <h3 style='margin:0 0 8px 0;'>Welcome to Ro<span style='color:#0b5cff;'>💳</span>Hit<span style='color:#0b5cff;'>📈</span>Fi 👋</h3>"
-                    + "      <p class='small'>Hi,</p>"
-                    + "      <p class='small'>🎉 Thank you for joining <strong>RoHitFi Digital Banking</strong>. Your account has been successfully created and linked to the mobile number <strong>+91 " + mobile + "</strong>.</p>"
-                    + "      <div class='notice'>"
-                    + "        <strong>Security</strong> — Your session tokens (JWT) are valid for <strong>24 hours</strong>. Never share your credentials or OTPs with anyone."
-                    + "      </div>"
-                    + "      <p class='small'>You can access your dashboard to explore features like instant transfers, bill payments, and investments. If you need help, our in-app support is available 24/7.</p>"
-                    + "      <a class='cta' href='#' target='_blank' rel='noopener'>Open Dashboard</a>"
-                    + "      <p style='margin-top:18px;' class='muted'>Warm regards,<br/><strong>The RoHitFi Security Team</strong></p>"
-                    + "    </div>"
-                    + "    <div class='footer'>"
-                    + "      <div class='muted'>This is an automated message. Please do not reply to this email.</div>"
-                    + "    </div>"
-                    + "  </div>"
-                    + "</div>"
-                    + "</body></html>";
+            if (response.getStatusCode().is2xxSuccessful()) {
+                log.info("✅ SUCCESS: Email dispatched to {} | Status: {}", toEmail, response.getStatusCode());
+            } else {
+                log.warn("⚠️ WARNING: Brevo API returned unexpected status {} for email to {}", response.getStatusCode(), toEmail);
+            }
 
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Welcome email sent asynchronously to {}", toEmail);
-
-        } catch (MessagingException e) {
-            log.error("Failed to send welcome email to {}", toEmail, e);
+        } catch (RestClientResponseException e) {
+            // This specifically catches HTTP 4xx and 5xx errors from Brevo (e.g., Bad API Key, Unverified Sender)
+            log.error("❌ CRITICAL EMAIL FAILURE: Brevo API rejected the email to {}.", toEmail);
+            log.error("   ↳ HTTP Status: {}", e.getRawStatusCode());
+            log.error("   ↳ Response Body: {}", e.getResponseBodyAsString());
+        } catch (Exception e) {
+            // Catches general network timeouts or Java errors
+            log.error("❌ NETWORK ERROR: Failed to reach Brevo REST API for {}. Error: {}", toEmail, e.getMessage(), e);
         }
     }
 
-    @Async // Runs in a background thread!
-    public void sendTransactionReceipt(String toEmail, String refNo, BigDecimal amount, String type, BigDecimal balanceAfter) {
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+    /* -------------------------
+       Shared style helpers
+       ------------------------- */
 
-            helper.setFrom(fromEmail);
-            helper.setTo(toEmail);
-            helper.setSubject("Ro💳Hit📈Fi Transaction Alert 🔔 — Ref: " + refNo);
-
-            String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss"));
-            String color = type.equalsIgnoreCase("CREDIT") ? "#16a34a" : "#dc2626"; // green for credit, red for debit
-
-            String htmlContent = "<!doctype html>"
-                    + "<html><head>"
-                    + "<meta charset='utf-8'/>"
-                    + "<meta name='viewport' content='width=device-width,initial-scale=1'/>"
-                    + "<style>"
-                    + "  body { font-family: 'Segoe UI', Roboto, Arial, sans-serif; color: #111827; background:#f3f4f6; margin:0; padding:20px; }"
-                    + "  .wrap { max-width:720px; margin:0 auto; }"
-                    + "  .card { background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 6px 18px rgba(15,23,42,0.06); }"
-                    + "  .header { padding:18px 22px; background:linear-gradient(90deg,#0b5cff 0%,#00c4ff 100%); color:#fff; display:flex; align-items:center; gap:12px; }"
-                    + "  .title { font-size:18px; font-weight:700; }"
-                    + "  .body { padding:20px; }"
-                    + "  .table { width:100%; border-collapse:collapse; margin-top:12px; }"
-                    + "  .table td { padding:10px 8px; border-bottom:1px solid #f1f5f9; }"
-                    + "  .label { color:#6b7280; width:40%; }"
-                    + "  .value { font-weight:700; }"
-                    + "  .amount { color:" + color + "; font-size:16px; font-weight:800; }"
-                    + "  .notice { margin-top:14px; color:#374151; }"
-                    + "  .footer { padding:14px 20px; background:#f9fafb; color:#6b7280; font-size:12px; }"
-                    + "  @media (max-width:480px){ .header{padding:14px} .body{padding:14px} }"
-                    + "</style>"
-                    + "</head><body>"
-                    + "<div class='wrap'>"
-                    + "  <div class='card'>"
-                    + "    <div class='header'>"
-                    + "      <div style='font-size:26px;'>🔔</div>"
-                    + "      <div>"
-                    + "        <div class='title'>Transaction Alert</div>"
-                    + "        <div style='font-size:12px; opacity:0.95;'>Reference: <strong>" + refNo + "</strong></div>"
-                    + "      </div>"
-                    + "    </div>"
-                    + "    <div class='body'>"
-                    + "      <p style='margin:0 0 8px 0;'>A transaction was processed on your RoHitFi account.</p>"
-                    + "      <table class='table'>"
-                    + "        <tr><td class='label'>Reference No</td><td class='value'>" + refNo + "</td></tr>"
-                    + "        <tr><td class='label'>Date & Time</td><td class='value'>" + dateStr + "</td></tr>"
-                    + "        <tr><td class='label'>Type</td><td class='value'>" + type + "</td></tr>"
-                    + "        <tr><td class='label'>Amount</td><td class='value amount'>₹ " + amount + "</td></tr>"
-                    + "        <tr><td class='label'>Available Balance</td><td class='value'>₹ " + balanceAfter + "</td></tr>"
-                    + "      </table>"
-                    + "      <p class='notice'>If you did not authorize this transaction, please block your card immediately via the dashboard or contact support.</p>"
-                    + "    </div>"
-                    + "    <div class='footer'>"
-                    + "      🔐 Automated notification from <strong>Ro<span style='color:#ffd166;'>💳</span>Hit<span style='color:#ffd166;'>📈</span>Fi</strong>. For assistance, visit your dashboard."
-                    + "    </div>"
-                    + "  </div>"
-                    + "</div>"
-                    + "</body></html>";
-
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Transaction receipt sent asynchronously to {}", toEmail);
-
-        } catch (MessagingException e) {
-            log.error("Failed to send transaction receipt to {}", toEmail, e);
-        }
-    }
-
-@Async
-public void sendLoanDisbursementEmail(String toEmail, String loanType, BigDecimal amount,
-                                      BigDecimal emiAmount, Integer tenureMonths,
-                                      BigDecimal interestRate, BigDecimal accountBalance) {
-    try {
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
-        helper.setFrom(fromEmail);
-        helper.setTo(toEmail);
-        helper.setSubject("🎉 Loan Disbursed Successfully — Ro💳Hit📈Fi");
-
-        String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy"));
-
-        String htmlContent = "<!doctype html>"
-                + "<html><head>"
+    private String wrapInBaseTemplate(String title, String preheader, String bodyHtml) {
+        // Modern, mobile-friendly wrapper with improved spacing and a refined logo block
+        return "<!doctype html>"
+                + "<html lang='en'>"
+                + "<head>"
                 + "<meta charset='utf-8'/>"
-                + "<meta name='viewport' content='width=device-width,initial-scale=1'/>"
-                + "<style>"
-                + "  body { font-family: 'Segoe UI', Roboto, Arial, sans-serif; color:#111827; background:#f3f4f6; margin:0; padding:20px; }"
-                + "  .wrap { max-width:680px; margin:0 auto; }"
-                + "  .card { background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 6px 18px rgba(15,23,42,0.08); }"
-                + "  .header { padding:20px; background:linear-gradient(90deg,#16a34a,#22c55e); color:#fff; display:flex; align-items:center; gap:12px; }"
-                + "  .title { font-size:20px; font-weight:700; }"
-                + "  .body { padding:22px; }"
-                + "  .table { width:100%; border-collapse:collapse; margin-top:12px; }"
-                + "  .table td { padding:10px 8px; border-bottom:1px solid #f1f5f9; }"
-                + "  .label { color:#6b7280; width:40%; }"
-                + "  .value { font-weight:700; }"
-                + "  .highlight { font-size:16px; font-weight:800; color:#065f46; }"
-                + "  .footer { padding:14px 20px; background:#f9fafb; color:#6b7280; font-size:12px; }"
-                + "</style>"
-                + "</head><body>"
-                + "<div class='wrap'>"
-                + "  <div class='card'>"
-                + "    <div class='header'>"
-                + "      <div style='font-size:28px;'>💰</div>"
-                + "      <div>"
-                + "        <div class='title'>Loan Disbursement Alert</div>"
-                + "        <div style='font-size:12px; opacity:0.9;'>Date: " + dateStr + "</div>"
-                + "      </div>"
+                + "<meta name='viewport' content='width=device-width, initial-scale=1'/>"
+                + "<title>" + escapeHtml(title) + "</title>"
+                + "</head>"
+                + "<body style='margin:0; padding:28px; background:#f6f8fb; font-family: \"Inter\", \"Segoe UI\", Roboto, Arial, sans-serif;'>"
+                + "<div style='max-width:720px; margin:0 auto;'>"
+                + "  <div style='display:flex; align-items:center; gap:16px; margin-bottom:18px;'>"
+                + "    <div style='width:64px; height:64px; border-radius:14px; display:flex; align-items:center; justify-content:center; "
+                + "                background:linear-gradient(135deg,#7c3aed,#06b6d4); color:white; font-weight:800; font-size:20px; box-shadow:0 8px 24px rgba(12,18,40,0.12);'>"
+                + "      RF"
                 + "    </div>"
-                + "    <div class='body'>"
-                + "      <p>Great news 🎉 — your <strong>" + loanType + "</strong> loan has been approved and credited to your account.</p>"
-                + "      <table class='table'>"
-                + "        <tr><td class='label'>Loan Type</td><td class='value'>" + loanType + "</td></tr>"
-                + "        <tr><td class='label'>Disbursed Amount</td><td class='value highlight'>₹ " + amount + "</td></tr>"
-                + "        <tr><td class='label'>Interest Rate</td><td class='value'>" + interestRate + "% p.a.</td></tr>"
-                + "        <tr><td class='label'>Tenure</td><td class='value'>" + tenureMonths + " Months</td></tr>"
-                + "        <tr><td class='label'>Monthly EMI</td><td class='value'>₹ " + emiAmount + "</td></tr>"
-                + "        <tr><td class='label'>Updated Bank Balance</td><td class='value'>₹ " + accountBalance + "</td></tr>"
-                + "      </table>"
-                + "      <p style='margin-top:14px;'>📅 Your EMI schedule is now active. You can view the full schedule in your banking dashboard.</p>"
-                + "      <p style='margin-top:12px;'>Thank you for banking with <strong>Ro<span style='color:#ffd166;'>💳</span>Hit<span style='color:#ffd166;'>📈</span>Fi</strong>.</p>"
-                + "    </div>"
-                + "    <div class='footer'>"
-                + "      🔐 This is an automated notification. For queries, please visit your dashboard or contact support."
+                + "    <div style='line-height:1.05;'>"
+                + "      <div style='font-size:18px; color:#0f172a; font-weight:800; margin-bottom:4px;'>" + escapeHtml(title) + "</div>"
+                + "      <div style='font-size:13px; color:#6b7280;'>" + escapeHtml(preheader) + "</div>"
                 + "    </div>"
                 + "  </div>"
+
+                + "  <div style='background:linear-gradient(180deg,#ffffff,#fbfdff); border-radius:14px; padding:20px; box-shadow:0 10px 30px rgba(2,6,23,0.06); border:1px solid rgba(15,23,42,0.03);'>"
+                + bodyHtml
+                + "  </div>"
+
+                + "  <div style='margin-top:14px; font-size:13px; color:#6b7280;'>"
+                + "    If you didn't expect this email, please ignore it or contact support at <a href='mailto:support@rohitfi.com' style='color:#7c3aed; text-decoration:none;'>support@rohitfi.com</a>."
+                + "  </div>"
+
+                + "  <div style='text-align:center; margin-top:18px; color:#9ca3af; font-size:12px;'>© " + LocalDateTime.now().getYear() + " RoHitFi Digital Banking</div>"
                 + "</div>"
-                + "</body></html>";
-
-        helper.setText(htmlContent, true);
-        mailSender.send(message);
-        log.info("Enriched loan disbursement email sent asynchronously to {}", toEmail);
-
-    } catch (MessagingException e) {
-        log.error("Failed to send loan email to {}", toEmail, e);
+                + "</body>"
+                + "</html>";
     }
-}
 
+    private String escapeHtml(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
+    }
+
+    /* -------------------------
+       Email templates (modern / GenZ aesthetic)
+       ------------------------- */
+
+    @Async
+    public void sendWelcomeEmail(String toEmail, String mobile) {
+        String subject = "🎉 Welcome to RoHitFi Digital Banking!";
+        String preheader = "Your account is ready — let's get you started.";
+        String body = ""
+                + "<div style='padding:18px; border-radius:12px; background:linear-gradient(180deg,#ffffff,#fbfdff);'>"
+                + "  <h1 style='margin:0; font-size:20px; color:#0f172a;'>👋 Hey there!</h1>"
+                + "  <p style='color:#374151; font-size:14px; margin-top:10px;'>Welcome to <strong>RoHitFi</strong>. Your account linked to <strong>" + escapeHtml(mobile) + "</strong> is now active.</p>"
+
+                + "  <div style='margin-top:16px; padding:14px; border-radius:12px; background:linear-gradient(90deg,#f8fafc,#f3f7fb); display:flex; gap:12px; align-items:center;'>"
+                + "    <div style='width:52px; height:52px; border-radius:10px; background:#eef2ff; display:flex; align-items:center; justify-content:center; color:#4f46e5; font-size:20px;'>🔒</div>"
+                + "    <div style='font-size:13px; color:#374151;'>Security note: Your session tokens (JWT) are valid for 24 hours. Never share your credentials.</div>"
+                + "  </div>"
+
+                + "  <div style='margin-top:18px;'>"
+                + "    <a href='https://rohitfi-backend.onrender.com/login' style='display:inline-block; padding:12px 18px; border-radius:10px; "
+                + "       background:linear-gradient(90deg,#7c3aed,#06b6d4); color:white; text-decoration:none; font-weight:700; box-shadow:0 8px 20px rgba(12,18,40,0.12);'>"
+                + "      Get started"
+                + "    </a>"
+                + "  </div>"
+
+                + "  <p style='margin-top:16px; color:#6b7280; font-size:13px;'>Cheers,<br/><strong>RoHitFi Security Team</strong></p>"
+                + "</div>";
+
+        sendViaBrevoApi(toEmail, subject, wrapInBaseTemplate(subject, preheader, body));
+    }
+
+    @Async
+    public void sendTransactionReceipt(String toEmail, String refNo, BigDecimal amount, String type, BigDecimal balanceAfter) {
+        String subject = "💳 Transaction Alert • " + refNo;
+        String preheader = "A transaction just happened on your account.";
+        String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss"));
+        String accent = type.equalsIgnoreCase("CREDIT") ? "#16a34a" : "#ef4444";
+
+        String body = ""
+                + "<div style='padding:18px; border-radius:12px; background:#ffffff;'>"
+                + "  <h2 style='margin:0; font-size:18px; color:#0f172a;'>Transaction confirmed</h2>"
+                + "  <p style='color:#374151; margin-top:10px;'>We processed a transaction on your account. Details below.</p>"
+
+                + "  <div style='margin-top:12px; border-radius:10px; overflow:hidden; border:1px solid #eef2f7;'>"
+                + "    <table style='width:100%; border-collapse:collapse; font-size:14px;'>"
+                + row("Reference", refNo)
+                + row("Date", dateStr)
+                + rowWithColor("Type", type, accent)
+                + row("Amount", "₹" + amount)
+                + row("Available Balance", "₹" + balanceAfter)
+                + "    </table>"
+                + "  </div>"
+
+                + "  <div style='margin-top:14px; padding:12px; border-radius:10px; background:#f8fafc; color:#374151; font-size:13px;'>"
+                + "    If you did not authorize this, lock your account immediately from the dashboard or contact support."
+                + "  </div>"
+                + "</div>";
+
+        sendViaBrevoApi(toEmail, subject, wrapInBaseTemplate(subject, preheader, body));
+    }
+
+    @Async
+    public void sendLoanDisbursementEmail(String toEmail, String loanType, BigDecimal amount,
+                                          BigDecimal emiAmount, Integer tenureMonths,
+                                          BigDecimal interestRate, BigDecimal accountBalance) {
+        String subject = "💰 Loan Disbursed • RoHitFi";
+        String preheader = "Funds have been credited to your account.";
+        String body = ""
+                + "<div style='padding:18px; border-radius:12px; background:#ffffff;'>"
+                + "  <h2 style='margin:0; font-size:18px; color:#0f172a;'>Loan Disbursed 🎉</h2>"
+                + "  <p style='color:#374151; margin-top:10px;'>Your <strong>" + escapeHtml(loanType) + "</strong> loan has been approved and disbursed.</p>"
+
+                + "  <div style='margin-top:12px; border-radius:10px; overflow:hidden; border:1px solid #eef2f7;'>"
+                + "    <table style='width:100%; border-collapse:collapse; font-size:14px;'>"
+                + row("Loan Type", loanType)
+                + row("Disbursed Amount", "₹" + amount)
+                + row("Interest Rate", interestRate + "% p.a.")
+                + row("Tenure", tenureMonths + " months")
+                + row("Monthly EMI", "₹" + emiAmount)
+                + row("Updated Balance", "₹" + accountBalance)
+                + "    </table>"
+                + "  </div>"
+
+                + "  <p style='margin-top:12px; color:#6b7280; font-size:13px;'>Your EMI schedule is active. View full details in your dashboard.</p>"
+                + "</div>";
+
+        sendViaBrevoApi(toEmail, subject, wrapInBaseTemplate(subject, preheader, body));
+    }
 
     @Async
     public void sendInvestmentReceiptEmail(String toEmail, String assetName, int quantity, BigDecimal totalAmount, String orderType) {
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        String subject = "📈 Trade Confirmed • " + assetName;
+        String preheader = "Your investment order has been executed.";
+        String color = orderType.equalsIgnoreCase("BUY") ? "#16a34a" : "#ef4444";
+        String action = orderType.equalsIgnoreCase("BUY") ? "purchased" : "sold";
 
-            helper.setFrom(fromEmail);
-            helper.setTo(toEmail);
-            helper.setSubject("📈 Investment Order Executed — " + assetName);
+        String body = ""
+                + "<div style='padding:18px; border-radius:12px; background:#ffffff;'>"
+                + "  <h2 style='margin:0; font-size:18px; color:#0f172a;'>Trade Confirmation</h2>"
+                + "  <p style='color:#374151; margin-top:10px;'>You have " + escapeHtml(action) + " <strong>" + quantity + "</strong> units of <strong>" + escapeHtml(assetName) + "</strong>.</p>"
 
-            String color = orderType.equalsIgnoreCase("BUY") ? "#16a34a" : "#dc2626";
-            String action = orderType.equalsIgnoreCase("BUY") ? "purchased" : "sold";
-            String dateStr = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm:ss"));
+                + "  <div style='margin-top:12px; border-radius:10px; overflow:hidden; border:1px solid #eef2f7;'>"
+                + "    <table style='width:100%; border-collapse:collapse; font-size:14px;'>"
+                + rowWithColor("Order Type", orderType, color)
+                + row("Asset", assetName)
+                + row("Quantity", quantity + " Units")
+                + row("Total Value", "₹" + totalAmount)
+                + "    </table>"
+                + "  </div>"
 
-            String htmlContent = "<!doctype html>"
-                    + "<html><head>"
-                    + "<meta charset='utf-8'/>"
-                    + "<meta name='viewport' content='width=device-width,initial-scale=1'/>"
-                    + "<style>"
-                    + "  body { font-family: 'Segoe UI', Roboto, Arial, sans-serif; color: #111827; background:#f3f4f6; margin:0; padding:20px; }"
-                    + "  .wrap { max-width:720px; margin:0 auto; }"
-                    + "  .card { background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 6px 18px rgba(15,23,42,0.06); }"
-                    + "  .header { padding:18px 22px; background:linear-gradient(90deg,#f59e0b 0%,#f97316 100%); color:#fff; display:flex; align-items:center; gap:12px; }"
-                    + "  .body { padding:20px; }"
-                    + "  .table { width:100%; border-collapse:collapse; margin-top:12px; }"
-                    + "  .table td { padding:10px 8px; border-bottom:1px solid #f1f5f9; }"
-                    + "  .label { color:#6b7280; width:40%; }"
-                    + "  .value { font-weight:700; }"
-                    + "  .amount { color:" + color + "; font-size:16px; font-weight:800; }"
-                    + "  .footer { padding:14px 20px; background:#f9fafb; color:#6b7280; font-size:12px; }"
-                    + "</style>"
-                    + "</head><body>"
-                    + "<div class='wrap'>"
-                    + "  <div class='card'>"
-                    + "    <div class='header'>"
-                    + "      <div style='font-size:26px;'>📊</div>"
-                    + "      <div>"
-                    + "        <div style='font-weight:700;'>Investment Confirmation</div>"
-                    + "        <div style='font-size:12px; opacity:0.95;'>Executed: " + dateStr + "</div>"
-                    + "      </div>"
-                    + "    </div>"
-                    + "    <div class='body'>"
-                    + "      <p style='margin:0 0 8px 0;'>Your investment order has been successfully executed ✅</p>"
-                    + "      <table class='table'>"
-                    + "        <tr><td class='label'>Order Type</td><td class='value'>" + orderType + "</td></tr>"
-                    + "        <tr><td class='label'>Asset Name</td><td class='value'>" + assetName + "</td></tr>"
-                    + "        <tr><td class='label'>Quantity</td><td class='value'>" + quantity + " Units</td></tr>"
-                    + "        <tr><td class='label'>Total Trade Value</td><td class='value amount'>₹ " + totalAmount + "</td></tr>"
-                    + "      </table>"
-                    + "      <p style='margin-top:12px;'>🎯 You have successfully " + action + " <strong>" + quantity + "</strong> units of <strong>" + assetName + "</strong>.</p>"
-                    + "      <p style='margin-top:8px;'>Happy Investing!<br/><strong>Ro<span style='color:#ffd166;'>💳</span>Hit<span style='color:#ffd166;'>📈</span>Fi Wealth Management</strong></p>"
-                    + "    </div>"
-                    + "    <div class='footer'>"
-                    + "      This is an automated confirmation. For details, check your portfolio in the dashboard."
-                    + "    </div>"
-                    + "  </div>"
-                    + "</div>"
-                    + "</body></html>";
+                + "  <p style='margin-top:12px; color:#6b7280; font-size:13px;'>This is your official trade receipt. Check your portfolio for updated holdings.</p>"
+                + "</div>";
 
-            helper.setText(htmlContent, true);
-            mailSender.send(message);
-            log.info("Investment receipt email sent asynchronously to {}", toEmail);
+        sendViaBrevoApi(toEmail, subject, wrapInBaseTemplate(subject, preheader, body));
+    }
 
-        } catch (MessagingException e) {
-            log.error("Failed to send investment receipt to {}", toEmail, e);
-        }
+    /* -------------------------
+       Small HTML helpers for table rows
+       ------------------------- */
+
+    private String row(String label, String value) {
+        return "<tr style='border-top:1px solid #eef2f7;'><td style='padding:12px 10px; color:#6b7280; width:40%; vertical-align:top;'><strong>"
+                + escapeHtml(label) + "</strong></td>"
+                + "<td style='padding:12px 10px; color:#0f172a;'>" + escapeHtml(value) + "</td></tr>";
+    }
+
+    private String rowWithColor(String label, String value, String color) {
+        return "<tr style='border-top:1px solid #eef2f7;'><td style='padding:12px 10px; color:#6b7280; width:40%; vertical-align:top;'><strong>"
+                + escapeHtml(label) + "</strong></td>"
+                + "<td style='padding:12px 10px; color:" + color + "; font-weight:700;'>" + escapeHtml(value) + "</td></tr>";
     }
 }

@@ -54,3 +54,4 @@ Desktop.ini
 .env
 .env.local
 *.private.properties
+application-local.yml

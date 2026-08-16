@@ -1,6 +1,12 @@
 spring:
   application:
     name: rohitfi-backend
+  profiles:
+    active: local
+
+#THIS: Delays creating beans until they are actually needed
+main:
+  lazy-initialization: true
 
   # --- RELATIONAL DATABASE (POSTGRESQL) ---
   datasource:
@@ -11,7 +17,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     show-sql: false
     open-in-view: false
     properties:
@@ -23,27 +29,6 @@ spring:
   data:
     mongodb:
       uri: ${MONGO_URI}
-
-  # --- EMAIL NOTIFICATION SETTINGS ---
-#  mail:
-#    host: smtp.gmail.com
-#    port: 587
-#    username: ${EMAIL_USER}
-#    password: ${EMAIL_PASS}
-#    properties:
-#      mail.smtp.auth: true
-#      mail.smtp.starttls.enable: true
-#      mail.smtp.starttls.required: true
-  mail:
-    host: smtp-relay.brevo.com
-    port: 587
-    username: ${BREVO_USER}   # e.g. xxxx@smtp-brevo.com
-    password: ${BREVO_PASSWORD}   # your SMTP key
-    properties:
-      mail.smtp.auth: true
-      mail.smtp.starttls.enable: true
-      mail.smtp.starttls.required: true
-
 
   # --- BASIC SECURITY ---
   security:
@@ -59,6 +44,11 @@ app:
   jwt:
     secret: ${JWT_SECRET}
     expiration-ms: 86400000
+
+# --- BREVO CONFIGURATION ---
+brevo:
+  api-key: ${BREVO_API_KEY:}
+  sender-email: ${BREVO_SENDER_EMAIL:rohitkadufreelance@gmail.com}
 
 springdoc:
   swagger-ui:
