@@ -2,9 +2,8 @@ spring:
   application:
     name: rohitfi-backend
 
-#THIS: Delays creating beans until they are actually needed
-main:
-  lazy-initialization: true
+  main:
+    lazy-initialization: true
 
   # --- RELATIONAL DATABASE (POSTGRESQL) ---
   datasource:
