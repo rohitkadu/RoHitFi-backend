@@ -46,7 +46,7 @@ public class EmailService {
 
         try {
             Map<String, Object> payload = Map.of(
-                    "sender", Map.of("name", "RoHitFi Digital Banking", "email", senderEmail),
+                    "sender", Map.of("name", "RoHitFi Digital Banking & Finance", "email", senderEmail),
                     "to", List.of(Map.of("email", toEmail)),
                     "subject", subject,
                     "htmlContent", htmlContent
@@ -111,7 +111,7 @@ public class EmailService {
                 + "    If you didn't expect this email, please ignore it or contact support at <a href='mailto:support@rohitfi.com' style='color:#7c3aed; text-decoration:none;'>support@rohitfi.com</a>."
                 + "  </div>"
 
-                + "  <div style='text-align:center; margin-top:18px; color:#9ca3af; font-size:12px;'>© " + LocalDateTime.now().getYear() + " RoHitFi Digital Banking</div>"
+                + "  <div style='text-align:center; margin-top:18px; color:#9ca3af; font-size:12px;'>© " + LocalDateTime.now().getYear() + " RoHitFi Digital Banking & Finance</div>"
                 + "</div>"
                 + "</body>"
                 + "</html>";
@@ -130,7 +130,7 @@ public class EmailService {
 
     @Async
     public void sendWelcomeEmail(String toEmail, String mobile) {
-        String subject = "🎉 Welcome to RoHitFi Digital Banking!";
+        String subject = "🎉 Welcome to RoHitFi Digital Banking & Finance!";
         String preheader = "Your account is ready — let's get you started.";
         String body = ""
                 + "<div style='padding:18px; border-radius:12px; background:linear-gradient(180deg,#ffffff,#fbfdff);'>"
